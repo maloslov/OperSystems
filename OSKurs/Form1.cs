@@ -13,11 +13,11 @@ using System.Windows.Forms;
 
 namespace OSServer
 {
-    enum Mode { Empty, Server, Client };
+    enum State { Empty, Server, Client };
 
     public partial class Form1 : Form
     {
-        private static Mode mode = Mode.Empty;
+        private static State mode = State.Empty;
         private static string message = "";
         private const int MAX_CLIENTS = 4;
         private const int MAX_BUFFER = 4096;
@@ -161,7 +161,7 @@ namespace OSServer
             disconnectButton.Enabled = false;
             shutdown1.Enabled = true;
             comboBox1.Enabled = false;
-            mode = Mode.Server;
+            mode = State.Server;
             serverEntry(11000, 1);
         }
 
@@ -203,7 +203,7 @@ namespace OSServer
 
         private void connectButton_Click(object sender, EventArgs e)
         {
-            mode = Mode.Client;
+            mode = State.Client;
             setup1.Enabled = false;
             sendButton.Enabled = true;
             disconnectButton.Enabled = true;
@@ -232,7 +232,7 @@ namespace OSServer
 
         private void disconnectButton_Click(object sender, EventArgs e)
         {
-            mode = Mode.Empty;
+            mode = State.Empty;
             sendButton.Enabled = false;
             disconnectButton.Enabled = false;
             setup1.Enabled = true;
@@ -251,7 +251,7 @@ namespace OSServer
         {
             switch (mode)
             {
-                case Mode.Server:
+                case State.Server:
                     {
                         if (!shutdown1.Enabled)
                         {
@@ -268,7 +268,7 @@ namespace OSServer
                             message = "";
                             socket.Close();
                             timer1.Stop();
-                            mode = Mode.Empty;
+                            mode = State.Empty;
                         }
                         else
                         {
@@ -288,7 +288,7 @@ namespace OSServer
                         }
                         break;
                     }
-                case Mode.Client:
+                case State.Client:
                     {
 
                         break;
