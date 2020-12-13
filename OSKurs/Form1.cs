@@ -26,6 +26,7 @@ namespace OSServer
         private static IPEndPoint ipEndPoint;
         private static List<Thread> t;
         private static List<Socket> clients;
+        private static Dictionary<string, Socket> clientsD;
 
         public Form1()
         {
@@ -227,7 +228,6 @@ namespace OSServer
                 return;
             }
             clientEntry(ipEndPoint);
-
         }
 
         private void disconnectButton_Click(object sender, EventArgs e)
@@ -237,6 +237,7 @@ namespace OSServer
             disconnectButton.Enabled = false;
             setup1.Enabled = true;
             serverBox.Items.Clear();
+            serverBox.Text = "";
         }
 
         private void sendButton_Click(object sender, EventArgs e)
