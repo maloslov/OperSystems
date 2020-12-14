@@ -46,9 +46,9 @@ int main()
     // Принимая дескриптор, имя и полное имя модуля - возвращаем два элемента в выходных параметрах
 
     cout << "Часть 1\r\n\tДля библиотеки:" << endl;
-    getFromName((wchar_t*)L"kernel32.dll");
-    getFromHandle((HMODULE)0x75E40000);
-    getFromPath((wchar_t*)L"C:\\Windows\\system32\\kernel32.dll");
+    getFromName((wchar_t*)L"ucrtbase.dll");
+    getFromHandle((HMODULE)0x753A0000);
+    getFromPath((wchar_t*)L"C:\\Windows\\system32\\ucrtbase.dll");
 
     cout << "\r\n\tДля приложения:" << endl;
     getFromName((wchar_t*)L"OS2.exe");
@@ -83,32 +83,41 @@ int main()
     PROCESSENTRY32 pEntry = {};
     pEntry.dwSize = sizeof(PROCESSENTRY32);
     Process32First(hSnapProcess, &pEntry);
-    cout << "Часть 3\r\n\tПРОЦЕССЫ\r\nПотоки\tМодуль" << endl;
-    wcout << pEntry.cntThreads << "\t" << pEntry.szExeFile << endl;
+    cout << "Часть 3\r\n\tПРОЦЕССЫ\r\nПотоки\tПриоритет\tМодуль" << endl;
+    wcout << pEntry.cntThreads << "\t" << 
+        pEntry.pcPriClassBase << "\t" << pEntry.szExeFile << endl;
 
     while (Process32Next(hSnapProcess, &pEntry)) {
-        wcout << pEntry.cntThreads << "\t" << pEntry.szExeFile << endl;
+        wcout << pEntry.cntThreads << "\t" << pEntry.pcPriClassBase 
+            <<"\t" << pEntry.szExeFile << endl;
     }
 
     THREADENTRY32 threadEntry = {};
     threadEntry.dwSize = sizeof(THREADENTRY32);
     Thread32First(hSnapThread, &threadEntry);
 
-    cout << "\r\n\tПОТОКИ\r\nID потока: " << "\tID владельца:\r\n" << endl;
-    wcout << threadEntry.th32ThreadID << "\t" << threadEntry.th32OwnerProcessID << endl;
+    cout << "\r\n\tПОТОКИ\r\nID потока: " << 
+        "\tПриоритет\tID владельца:"<<"\t\r\n" << endl;
+    wcout << threadEntry.th32ThreadID << 
+        "\t" << threadEntry.th32OwnerProcessID << 
+        "\t" << threadEntry.tpBasePri << endl;
 
     while (Thread32Next(hSnapThread, &threadEntry)) {
-        wcout << threadEntry.th32ThreadID << "\t" << threadEntry.th32OwnerProcessID << endl;
+        wcout << threadEntry.th32ThreadID << 
+            "\t" << threadEntry.th32OwnerProcessID<<
+            "\t" << threadEntry.tpBasePri << endl;
     }
 
     MODULEENTRY32 modEntry = {};
     modEntry.dwSize = sizeof(MODULEENTRY32);
     Module32First(hSnapModule, &modEntry);
-    cout << "\r\n\tМОДУЛИ" << endl; 
-    wcout << modEntry.szModule << endl;
+    cout << "\r\n\tМОДУЛИ" << endl;
+    wcout << modEntry.szModule << "\t" <<
+        modEntry.ProccntUsage << "\t" << modEntry.szExePath << endl;
 
     while (Module32Next(hSnapModule, &modEntry)) {
-        wcout << modEntry.szModule << endl;
+        wcout << modEntry.szModule << "\t" <<
+            modEntry.ProccntUsage << "\t" << modEntry.szExePath << endl;
     }
 
     CloseHandle(hSnapProcess);

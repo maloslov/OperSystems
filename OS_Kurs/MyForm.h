@@ -490,14 +490,15 @@ namespace Forma {
 		socket = gcnew Socket(ipAddr->AddressFamily, 
 			SocketType::Stream, ProtocolType::Tcp);
 		//socket->ReceiveTimeout = 60000;
+
 		try
 		{
 			socket->Bind(ipEndPoint);
 			socket->Listen(MAX_CLIENTS);
-
-			serverLog->Text += DateTime::Now + " - " +
+			int хуй = 0;
+			serverLog->AppendText(DateTime::Now + " - " +
 				"Сервер " + socket->LocalEndPoint->ToString()->Split(':')[3] +
-				" начинает работу как " + comboBox1->Text + "\r\n";
+				" начинает работу как " + comboBox1->Text + "\r\n");
 
 			comboBox1->Enabled = false;
 			if (comboBox1->Text->Equals("Процесс 1"))
@@ -533,6 +534,7 @@ namespace Forma {
 		{
 			Socket^ client = socket->Accept();
 
+			::EnterCriticalSection();
 			mutex->WaitOne();
 			clients[n] = client;
 			message += (DateTime::Now + " - " +
@@ -791,7 +793,7 @@ namespace Forma {
 				|| se->SocketErrorCode == SocketError::ConnectionReset)
 			clientLog->AppendText(DateTime::Now + " - Сервер "
 				+ socket->RemoteEndPoint->ToString()->Split(':')[3]
-				+ " разорвал соединение\r\n");
+				+ " недоступен\r\n");
 		}
 	}
 		   private: static bool FindPredicate(Socket^ o) {
