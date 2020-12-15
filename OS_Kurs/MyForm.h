@@ -495,7 +495,7 @@ namespace Forma {
 		{
 			socket->Bind(ipEndPoint);
 			socket->Listen(MAX_CLIENTS);
-			int хуй = 0;
+			
 			serverLog->AppendText(DateTime::Now + " - " +
 				"Сервер " + socket->LocalEndPoint->ToString()->Split(':')[3] +
 				" начинает работу как " + comboBox1->Text + "\r\n");
@@ -534,7 +534,7 @@ namespace Forma {
 		{
 			Socket^ client = socket->Accept();
 
-			::EnterCriticalSection();
+			//::EnterCriticalSection();
 			mutex->WaitOne();
 			clients[n] = client;
 			message += (DateTime::Now + " - " +
