@@ -28,6 +28,7 @@ namespace Forma {
 	public ref class MyForm : public System::Windows::Forms::Form
 	{
 	protected:
+		//LPCRITICAL_SECTION critsection;
 		static State state = State::Empty;
 		static String^ message = "";
 		static Socket^ socket;
@@ -324,8 +325,7 @@ namespace Forma {
 			// 
 			// groupBox4
 			// 
-			this->groupBox4->Anchor = static_cast<System::Windows::Forms::AnchorStyles>((((System::Windows::Forms::AnchorStyles::Top | System::Windows::Forms::AnchorStyles::Bottom)
-				| System::Windows::Forms::AnchorStyles::Left)
+			this->groupBox4->Anchor = static_cast<System::Windows::Forms::AnchorStyles>(((System::Windows::Forms::AnchorStyles::Bottom | System::Windows::Forms::AnchorStyles::Left)
 				| System::Windows::Forms::AnchorStyles::Right));
 			this->groupBox4->Controls->Add(this->tableLayoutPanel1);
 			this->groupBox4->Location = System::Drawing::Point(5, 299);
@@ -485,6 +485,7 @@ namespace Forma {
 
 	private: System::Void serverEntry(int port)
 	{
+		//инициализация сокета
 		ipAddr = Dns::GetHostEntry("localhost")->AddressList[0]; //.GetHostByName("localhost").AddressList[0]; // IPAddress.Any;
 		ipEndPoint = gcnew IPEndPoint(ipAddr, port);
 		socket = gcnew Socket(ipAddr->AddressFamily, 
@@ -505,6 +506,7 @@ namespace Forma {
 				state = State::Server1;
 			else state = State::Server2;
 
+			//запуск потоков для подключения
 			for (int i = 0; i < MAX_CLIENTS; i++)
 			{
 				t->Add(gcnew Thread(gcnew ThreadStart(this, &MyForm::Getmsg)));
@@ -517,7 +519,6 @@ namespace Forma {
 			}
 
 			timer1->Start();
-
 		}
 		catch (SocketException^ e)
 		{
@@ -532,18 +533,21 @@ namespace Forma {
 			Convert::ToInt32(Thread::CurrentThread->Name->Split(' ')[1]);
 		try
 		{
+			//создание сокета для соединения с клиентом
 			Socket^ client = socket->Accept();
 
-			//::EnterCriticalSection();
+			//EnterCriticalSection(critsection);
+			
 			mutex->WaitOne();
 			clients[n] = client;
 			message += (DateTime::Now + " - " +
 				Thread::CurrentThread->Name +
 				" принял соединение от " +
-				client->LocalEndPoint->ToString()->Split(':')[3] + "\r\n");
+				client->RemoteEndPoint->ToString()->Split(':')[3] + "\r\n");
 			mutex->ReleaseMutex();
-			String^ request = "";
 
+			Begin:
+			String^ request = "";
 			// Мы дождались клиента, пытающегося с нами соединиться
 			cli::array<unsigned char>^ bytes = 
 				gcnew cli::array<unsigned char>(MAX_BUFFER);
@@ -552,12 +556,12 @@ namespace Forma {
 			System::Text::UTF8Encoding^ encoder = gcnew System::Text::UTF8Encoding;
 			request += encoder->GetString(bytes, 0, bytesRec);
 
-			mutex->WaitOne();
 			// Показываем данные
+			mutex->WaitOne();
 			message += (DateTime::Now + " - " +
 				Thread::CurrentThread->Name +
 				" получил запрос от " +
-				client->LocalEndPoint->ToString()->Split(':')[3] + ": " +
+				client->RemoteEndPoint->ToString()->Split(':')[3] + ": " +
 				request + "\r\n");
 			mutex->ReleaseMutex();
 
@@ -577,19 +581,19 @@ namespace Forma {
 			}
 			else  response += "Неверный запрос!";
 
-			//String^ reply = "Спасибо за запрос в " + data->Length + " символов";
 			cli::array<unsigned char>^ msg = 
 				System::Text::Encoding::UTF8->GetBytes(response);
 			client->Send(msg);
+			if(!shut)
+				goto Begin;
 
 			mutex->WaitOne();
 			message += (DateTime::Now + " - " +
 				Thread::CurrentThread->Name +
 				" завершил соединение с клиентом " +
-				client->LocalEndPoint->ToString()->Split(':')[3] + "\r\n");
+				client->RemoteEndPoint->ToString()->Split(':')[3] + "\r\n");
 			if(shut) state = State::Shut;
 			mutex->ReleaseMutex();
-
 		}
 		catch (SocketException^ se)
 		{
@@ -629,7 +633,6 @@ namespace Forma {
 			clients[n]->Close();
 			mutex->ReleaseMutex();
 		}
-
 	}
 
 
@@ -653,6 +656,7 @@ namespace Forma {
 		shutdown1->Enabled = false;
 		comboBox1->Enabled = true; 
 	}
+		   //получение данных для процесса 1
 		   String^ GetData1() {
 			   return ("Machine name: " +
 				   Environment::MachineName + " | " +
@@ -660,6 +664,7 @@ namespace Forma {
 				   "OS version: " + Environment::OSVersion + " | " +
 				   "Is OS x64: " + Environment::Is64BitOperatingSystem);
 		   }
+		   //прлучение данных для процесса 2
 		   String^ GetData2() {
 			   MEMORYSTATUSEX M;
 			   M.dwLength = sizeof(M);
@@ -687,36 +692,6 @@ namespace Forma {
 
 #pragma region Client
 
-	private: System::Void clientEntry(IPEndPoint^ EndPoint)
-	{
-		IPEndPoint^ ep = EndPoint;
-		Socket^ s = gcnew Socket(ep->AddressFamily, 
-			SocketType::Stream, ProtocolType::Tcp);
-
-		String^ str;
-		try
-		{
-			s->Connect(ep);
-			str = s->RemoteEndPoint->ToString()->Split(':')[3];
-		}
-		catch (SocketException^ se)
-		{
-
-			if (se->SocketErrorCode == SocketError::ConnectionRefused)
-				
-				clientLog->AppendText(DateTime::Now + " - Cервер " 
-					+ ep->Port + " отказал в соединении\r\n");
-			return;
-		}
-
-		//MessageBox::Show(str);
-		serverBox->Items->Add(str);
-		clients->Add(s);
-		portBox->Items->Add(str);
-		clientLog->AppendText(DateTime::Now + 
-			" - Клиент подключился к серверу с портом " + str + "\r\n");
-	}
-
 	private: System::Void connectBtn_Click(System::Object^ sender, System::EventArgs^ e)
 	{
 		if (state != State::Client)
@@ -731,22 +706,48 @@ namespace Forma {
 		}
 		catch (FormatException^)
 		{
-			MessageBox::Show("Не удалось подключиться к указанному порту!",
+			MessageBox::Show("Неверный формат!",
 				"Внимание",
 				MessageBoxButtons::OK, MessageBoxIcon::Warning);
 			return;
 		}
+		//проверка порта
 		ipAddr = Dns::GetHostEntry("localhost")->AddressList[0];
-		//ipAddr = IPAddress.Parse(str[0]);
 		ipEndPoint = gcnew IPEndPoint(ipAddr, port);
-		if (serverBox->Items->Contains(ipEndPoint->ToString()))
+		if (serverBox->Items->Contains(ipEndPoint->Port))
 		{
 			MessageBox::Show("Соединение с этим сервером уже установлено!", 
 				"Внимание", MessageBoxButtons::OK, 
 				MessageBoxIcon::Information);
 			return;
 		}
-		clientEntry(ipEndPoint);
+
+		//создание сокета
+		IPEndPoint^ ep = ipEndPoint;
+		Socket^ s = gcnew Socket(ep->AddressFamily, 
+			SocketType::Stream, ProtocolType::Tcp);
+
+		String^ str;
+		try
+		{
+			//соединение с сервером
+			s->Connect(ep);
+			str = s->RemoteEndPoint->ToString()->Split(':')[3];
+		}
+		catch (SocketException^ se)
+		{
+			if (se->SocketErrorCode == SocketError::ConnectionRefused)
+				clientLog->AppendText(DateTime::Now + " - Cервер " 
+					+ ep->Port + " отказал в соединении\r\n");
+			return;
+		}
+
+		
+		serverBox->Items->Add(str);
+		clients->Add(s);
+		portBox->Items->Add(str);
+		clientLog->AppendText(DateTime::Now + 
+			" - Клиент подключился к серверу с портом " + str + "\r\n");
 	}
 
 	private: System::Void disconBtn_Click(System::Object^ sender, System::EventArgs^ e)
@@ -759,6 +760,7 @@ namespace Forma {
 		serverBox->Text = "";
 		t->Clear();
 		clients->Clear();
+		serverBox->Items->Clear();
 	}
 
 	private: System::Void sendBtn_Click(System::Object^ sender, System::EventArgs^ e)
@@ -771,22 +773,24 @@ namespace Forma {
 		message = serverBox->Text;
 		socket = clients->Find(gcnew Predicate<Socket^>(FindPredicate));
 		
+		//кодирование сообщения
 		System::Text::UTF8Encoding^ encoder = 
 			gcnew System::Text::UTF8Encoding;
 		cli::array<unsigned char>^ bytes = 
 			encoder->GetBytes(commandBox->Text);
 		try {
+			//попытка отправления
 			socket->Send(bytes);
+			
 			bytes =
 				gcnew cli::array<unsigned char>(MAX_BUFFER);
-
 			message = "";
+			//прием сообщения и декодирование
 			int bytesrec = socket->Receive(bytes);
 			message += encoder->GetString(bytes, 0, bytesrec);
 			clientLog->AppendText(DateTime::Now + 
 				" - Ответ сервера: \r\n" + message + "\r\n");
 			message = "";
-			socket->Connect(socket->RemoteEndPoint);
 		}
 		catch (SocketException^ se) {
 			if(se->SocketErrorCode == SocketError::ConnectionAborted 
@@ -794,11 +798,11 @@ namespace Forma {
 			clientLog->AppendText(DateTime::Now + " - Сервер "
 				+ socket->RemoteEndPoint->ToString()->Split(':')[3]
 				+ " недоступен\r\n");
+			socket->Shutdown(SocketShutdown::Both);
 		}
 	}
 		   private: static bool FindPredicate(Socket^ o) {
-			   return (o->RemoteEndPoint->ToString()->Split(':')[3]
-				   == message);
+			   return (o->RemoteEndPoint->ToString()->Split(':')[3]->Equals(message));
 		   }
 #pragma endregion
 
@@ -818,6 +822,7 @@ namespace Forma {
 		{
 			if (!shutdown1->Enabled)
 			{
+				//завершение потоков
 				for (int i = 0; i < MAX_CLIENTS; i++)
 				{
 					t[i]->Interrupt();
@@ -839,7 +844,7 @@ namespace Forma {
 			{
 				serverLog->Text += message;
 				message = "";
-
+				//возобновление завершенных потоков
 				for (int i = 0; i < MAX_CLIENTS; i++)
 				{
 					if (!t[i]->IsAlive // == System::Threading::ThreadState::
@@ -853,13 +858,11 @@ namespace Forma {
 							" отключается и ожидает соединение\r\n");
 					}
 				}
-
 			}
 			break;
 		}
 		case State::Client:
 		{
-
 			break;
 		}
 		}
