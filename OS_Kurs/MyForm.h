@@ -714,7 +714,7 @@ namespace Forma {
 		//проверка порта
 		ipAddr = Dns::GetHostEntry("localhost")->AddressList[0];
 		ipEndPoint = gcnew IPEndPoint(ipAddr, port);
-		if (serverBox->Items->Contains(ipEndPoint->Port))
+		if (serverBox->Items->Contains(ipEndPoint->Port.ToString()))
 		{
 			MessageBox::Show("Соединение с этим сервером уже установлено!", 
 				"Внимание", MessageBoxButtons::OK, 
@@ -742,7 +742,7 @@ namespace Forma {
 			return;
 		}
 
-		
+		s->Shutdown(SocketShutdown::Both);
 		serverBox->Items->Add(str);
 		clients->Add(s);
 		portBox->Items->Add(str);
@@ -759,6 +759,10 @@ namespace Forma {
 		serverBox->Items->Clear();
 		serverBox->Text = "";
 		t->Clear();
+		for (int i = 0; i < clients->Count; i++) {
+			clients[i]->Shutdown(SocketShutdown::Both);
+			clients[i]->Close();
+		}
 		clients->Clear();
 		serverBox->Items->Clear();
 	}
@@ -772,7 +776,8 @@ namespace Forma {
 
 		message = serverBox->Text;
 		socket = clients->Find(gcnew Predicate<Socket^>(FindPredicate));
-		
+		socket->Blocking = false;
+
 		//кодирование сообщения
 		System::Text::UTF8Encoding^ encoder = 
 			gcnew System::Text::UTF8Encoding;
@@ -791,6 +796,12 @@ namespace Forma {
 			clientLog->AppendText(DateTime::Now + 
 				" - Ответ сервера: \r\n" + message + "\r\n");
 			message = "";
+			if (commandBox->Text->Equals("Завершение работы")) {
+				serverBox->Items->Remove(socket->RemoteEndPoint->ToString()->Split(':')[3]);
+				clients->Remove(socket);
+				socket->Shutdown(SocketShutdown::Both);
+				socket->Close();
+			}
 		}
 		catch (SocketException^ se) {
 			if(se->SocketErrorCode == SocketError::ConnectionAborted 
@@ -798,7 +809,10 @@ namespace Forma {
 			clientLog->AppendText(DateTime::Now + " - Сервер "
 				+ socket->RemoteEndPoint->ToString()->Split(':')[3]
 				+ " недоступен\r\n");
+			serverBox->Items->Remove(socket->RemoteEndPoint->ToString()->Split(':')[3]);
+			clients->Remove(socket);
 			socket->Shutdown(SocketShutdown::Both);
+			socket->Close();
 		}
 	}
 		   private: static bool FindPredicate(Socket^ o) {
@@ -860,9 +874,11 @@ namespace Forma {
 				}
 			}
 			break;
-		}
 		case State::Client:
-		{
+			for (int i = 0; i < clients->Count; i++) {
+				if (!clients[i]->Connected)
+					clients[i]->Close();				
+			}
 			break;
 		}
 		}
