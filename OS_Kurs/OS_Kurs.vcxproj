@@ -115,6 +115,9 @@
     </ClCompile>
     <Link>
       <AdditionalDependencies />
+      <Version>1.0</Version>
+      <EntryPointSymbol>Main</EntryPointSymbol>
+      <SubSystem>Windows</SubSystem>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">

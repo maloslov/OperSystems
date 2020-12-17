@@ -1,8 +1,8 @@
 #pragma once
 #include <winsock.h>
 
-#define MAX_CLIENTS 4
-#define MAX_BUFFER 4096
+#define MAX_CLIENTS 10
+#define MAX_BUFFER 1024
 #define REQUESTDATA "Запрос данных"
 #define REQUESTSHUTDOWN "Завершение работы"
 
@@ -28,20 +28,20 @@ namespace Forma {
 	public ref class MyForm : public System::Windows::Forms::Form
 	{
 	protected:
-		//LPCRITICAL_SECTION critsection;
 		static State state = State::Empty;
 		static String^ message = "";
-		static Socket^ socket;
+		static Socket^ socket; 
 		static IPAddress^ ipAddr;
 		static IPEndPoint^ ipEndPoint;
 		static List<Thread^>^ t = gcnew List<Thread^>();
 		static List<Socket^>^ clients = gcnew List<Socket^>();
 		static Mutex^ mutex = gcnew Mutex();
 	private: System::Windows::Forms::Button^ Clear1;
+	private: System::Windows::Forms::TextBox^ portBox;
 	protected:
 	private: System::Windows::Forms::Button^ Clear2;
 
-	private: System::Windows::Forms::ComboBox^ portBox;
+
 	protected:
 	public:
 		MyForm(void)
@@ -118,8 +118,8 @@ namespace Forma {
 			this->setup1 = (gcnew System::Windows::Forms::Button());
 			this->label1 = (gcnew System::Windows::Forms::Label());
 			this->tabPage2 = (gcnew System::Windows::Forms::TabPage());
+			this->portBox = (gcnew System::Windows::Forms::TextBox());
 			this->Clear2 = (gcnew System::Windows::Forms::Button());
-			this->portBox = (gcnew System::Windows::Forms::ComboBox());
 			this->groupBox4 = (gcnew System::Windows::Forms::GroupBox());
 			this->tableLayoutPanel1 = (gcnew System::Windows::Forms::TableLayoutPanel());
 			this->label4 = (gcnew System::Windows::Forms::Label());
@@ -242,7 +242,7 @@ namespace Forma {
 			this->groupBox1->Size = System::Drawing::Size(519, 353);
 			this->groupBox1->TabIndex = 4;
 			this->groupBox1->TabStop = false;
-			this->groupBox1->Text = L"Server log";
+			this->groupBox1->Text = L"Лог сервера";
 			// 
 			// serverLog
 			// 
@@ -289,8 +289,8 @@ namespace Forma {
 			// 
 			// tabPage2
 			// 
-			this->tabPage2->Controls->Add(this->Clear2);
 			this->tabPage2->Controls->Add(this->portBox);
+			this->tabPage2->Controls->Add(this->Clear2);
 			this->tabPage2->Controls->Add(this->groupBox4);
 			this->tabPage2->Controls->Add(this->groupBox2);
 			this->tabPage2->Controls->Add(this->disconBtn);
@@ -304,6 +304,15 @@ namespace Forma {
 			this->tabPage2->Text = L"Клиент";
 			this->tabPage2->UseVisualStyleBackColor = true;
 			// 
+			// portBox
+			// 
+			this->portBox->Location = System::Drawing::Point(48, 8);
+			this->portBox->MaxLength = 6;
+			this->portBox->Name = L"portBox";
+			this->portBox->Size = System::Drawing::Size(76, 20);
+			this->portBox->TabIndex = 1;
+			this->portBox->Text = L"11000";
+			// 
 			// Clear2
 			// 
 			this->Clear2->Location = System::Drawing::Point(445, 7);
@@ -313,15 +322,6 @@ namespace Forma {
 			this->Clear2->Text = L"Очистить";
 			this->Clear2->UseVisualStyleBackColor = true;
 			this->Clear2->Click += gcnew System::EventHandler(this, &MyForm::Clear2_Click);
-			// 
-			// portBox
-			// 
-			this->portBox->FormattingEnabled = true;
-			this->portBox->Location = System::Drawing::Point(48, 4);
-			this->portBox->Name = L"portBox";
-			this->portBox->Size = System::Drawing::Size(76, 21);
-			this->portBox->TabIndex = 6;
-			this->portBox->Text = L"11000";
 			// 
 			// groupBox4
 			// 
@@ -513,9 +513,9 @@ namespace Forma {
 				t[i]->Name = "Поток " + i;
 				clients->Add(socket);
 				t[i]->Start();
-				message += (DateTime::Now + " - " +
-					t[i]->Name +
-					" ожидает соединение\r\n");
+				//message += (DateTime::Now + " - " +
+				//	t[i]->Name +
+				//	" ожидает соединение\r\n");
 			}
 
 			timer1->Start();
@@ -536,8 +536,6 @@ namespace Forma {
 			//создание сокета для соединения с клиентом
 			Socket^ client = socket->Accept();
 
-			//EnterCriticalSection(critsection);
-			
 			mutex->WaitOne();
 			clients[n] = client;
 			message += (DateTime::Now + " - " +
@@ -567,24 +565,25 @@ namespace Forma {
 
 			// Отправляем ответ клиенту
 			String^ response = "";
-			bool shut = false;
+			int sh = 0; //переменная для завершения подключения или сервера
 			
-			if (request->Equals(REQUESTDATA)) {
+			if (request->Contains(REQUESTDATA)) {
 				if (state == State::Server1)
 					response += GetData1();
 				else response += GetData2();
+				sh = 1;
 			}
-			else if (request->Equals(REQUESTSHUTDOWN)) {
+			else if (request->Contains(REQUESTSHUTDOWN)) {
 				response += "Сервер " + ipEndPoint->Port +
 					" завершил работу\r\n";
-				shut = true;
+				sh = 2;
 			}
 			else  response += "Неверный запрос!";
 
 			cli::array<unsigned char>^ msg = 
 				System::Text::Encoding::UTF8->GetBytes(response);
 			client->Send(msg);
-			if(!shut)
+			if(sh != 2)
 				goto Begin;
 
 			mutex->WaitOne();
@@ -592,19 +591,11 @@ namespace Forma {
 				Thread::CurrentThread->Name +
 				" завершил соединение с клиентом " +
 				client->RemoteEndPoint->ToString()->Split(':')[3] + "\r\n");
-			if(shut) state = State::Shut;
+			if(sh==2) state = State::Shut;
 			mutex->ReleaseMutex();
 		}
 		catch (SocketException^ se)
 		{
-			/*
-			if (se->SocketErrorCode == SocketError::ConnectionAborted) {
-				mutex->WaitOne();
-				message += DateTime::Now + " - " +
-					Thread::CurrentThread->Name +
-					" соединение разорвано\r\n";
-				mutex->ReleaseMutex();
-			}*/
 			if (se->SocketErrorCode == 
 				SocketError::ConnectionReset
 				|| se->SocketErrorCode == 
@@ -619,13 +610,7 @@ namespace Forma {
 			} 
 
 		}
-		catch (ThreadInterruptedException^)
-		{
-
-			//client.Shutdown(SocketShutdown.Both);
-			//client.Close();
-
-		}
+		catch (ThreadInterruptedException^){}
 		if (shutdown1->Enabled)
 		{
 			mutex->WaitOne();
@@ -645,11 +630,13 @@ namespace Forma {
 		disconBtn->Enabled = false;
 		shutdown1->Enabled = true;
 		comboBox1->Enabled = false;
+		sendBtn->Enabled = false;
 		serverEntry(11000);
 	}
 
 	private: System::Void shutdown1_Click(System::Object^ sender, System::EventArgs^ e)
 	{
+		sendBtn->Enabled = true;
 		setup1->Enabled = true;
 		connectBtn->Enabled = true;
 		disconBtn->Enabled = true;
@@ -741,11 +728,9 @@ namespace Forma {
 					+ ep->Port + " отказал в соединении\r\n");
 			return;
 		}
-
-		s->Shutdown(SocketShutdown::Both);
 		serverBox->Items->Add(str);
 		clients->Add(s);
-		portBox->Items->Add(str);
+		serverBox->Text = str;
 		clientLog->AppendText(DateTime::Now + 
 			" - Клиент подключился к серверу с портом " + str + "\r\n");
 	}
@@ -776,7 +761,6 @@ namespace Forma {
 
 		message = serverBox->Text;
 		socket = clients->Find(gcnew Predicate<Socket^>(FindPredicate));
-		socket->Blocking = false;
 
 		//кодирование сообщения
 		System::Text::UTF8Encoding^ encoder = 
@@ -792,6 +776,7 @@ namespace Forma {
 			message = "";
 			//прием сообщения и декодирование
 			int bytesrec = socket->Receive(bytes);
+			socket->Blocking = true;
 			message += encoder->GetString(bytes, 0, bytesrec);
 			clientLog->AppendText(DateTime::Now + 
 				" - Ответ сервера: \r\n" + message + "\r\n");
@@ -840,10 +825,7 @@ namespace Forma {
 				for (int i = 0; i < MAX_CLIENTS; i++)
 				{
 					t[i]->Interrupt();
-					//clients[i].Shutdown(SocketShutdown.Both);
-					//clients[i].Close();
 				}
-				//socket.Shutdown(SocketShutdown.Both);
 				serverLog->Text += DateTime::Now + " - " +
 					"Сервер " + ipEndPoint->Port +
 					" завершил работу\r\n";
@@ -861,8 +843,7 @@ namespace Forma {
 				//возобновление завершенных потоков
 				for (int i = 0; i < MAX_CLIENTS; i++)
 				{
-					if (!t[i]->IsAlive // == System::Threading::ThreadState::
-						)
+					if (!t[i]->IsAlive)
 					{
 						t[i] = gcnew Thread(gcnew ThreadStart(this, &MyForm::Getmsg));
 						t[i]->Name = "Поток " + i;
