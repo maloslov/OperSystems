@@ -35,7 +35,7 @@ namespace Forma {
 		static IPEndPoint^ ipEndPoint;
 		static List<Thread^>^ t = gcnew List<Thread^>();
 		static List<Socket^>^ clients = gcnew List<Socket^>();
-		static Mutex^ mutex = gcnew Mutex();
+		static Mutex^ mutex = gcnew Mutex("mutex");
 	private: System::Windows::Forms::Button^ Clear1;
 	private: System::Windows::Forms::TextBox^ portBox;
 	protected:
