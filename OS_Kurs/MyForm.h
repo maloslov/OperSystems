@@ -28,14 +28,14 @@ namespace Forma {
 	public ref class MyForm : public System::Windows::Forms::Form
 	{
 	protected:
-		static State state = State::Empty;
+		State state = State::Empty;
 		static String^ message = "";
-		static Socket^ socket; 
-		static IPAddress^ ipAddr;
-		static IPEndPoint^ ipEndPoint;
-		static List<Thread^>^ t = gcnew List<Thread^>();
-		static List<Socket^>^ clients = gcnew List<Socket^>();
-		static Mutex^ mutex = gcnew Mutex("mutex");
+		Socket^ socket; 
+		IPAddress^ ipAddr;
+		IPEndPoint^ ipEndPoint;
+		List<Thread^>^ t = gcnew List<Thread^>();
+		List<Socket^>^ clients = gcnew List<Socket^>();
+		Mutex^ mutex = gcnew Mutex();
 	private: System::Windows::Forms::Button^ Clear1;
 	private: System::Windows::Forms::TextBox^ portBox;
 	protected:
@@ -486,11 +486,10 @@ namespace Forma {
 	private: System::Void serverEntry(int port)
 	{
 		//инициализация сокета
-		ipAddr = Dns::GetHostEntry("localhost")->AddressList[0]; //.GetHostByName("localhost").AddressList[0]; // IPAddress.Any;
+		ipAddr = Dns::GetHostEntry("localhost")->AddressList[0]; 
 		ipEndPoint = gcnew IPEndPoint(ipAddr, port);
 		socket = gcnew Socket(ipAddr->AddressFamily, 
 			SocketType::Stream, ProtocolType::Tcp);
-		//socket->ReceiveTimeout = 60000;
 
 		try
 		{
@@ -506,17 +505,14 @@ namespace Forma {
 				state = State::Server1;
 			else state = State::Server2;
 
-			//запуск потоков для подключения
-			for (int i = 0; i < MAX_CLIENTS; i++)
-			{
-				t->Add(gcnew Thread(gcnew ThreadStart(this, &MyForm::Getmsg)));
-				t[i]->Name = "Поток " + i;
-				clients->Add(socket);
-				t[i]->Start();
-				//message += (DateTime::Now + " - " +
-				//	t[i]->Name +
-				//	" ожидает соединение\r\n");
-			}
+				//запуск потоков для подключения
+				for (int i = 0; i < MAX_CLIENTS; i++)
+				{
+					t->Add(gcnew Thread(gcnew Threading::ThreadStart(this, &MyForm::Getmsg)));
+					t[i]->Name = "Поток " + i;
+					clients->Add(socket);
+					t[i]->Start();
+				}
 
 			timer1->Start();
 		}
